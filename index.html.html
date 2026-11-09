@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPACE MISSION – Petualangan Luar Angkasa (Siklus Air Kelas 5)</title>
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- MediaPipe Hands Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap');
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #030712;
+            color: #f3f4f6;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Glassmorphism UI Effects */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+        }
+
+        .glass-button {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.4), rgba(99, 102, 241, 0.4));
+            border: 1px solid rgba(125, 211, 252, 0.4);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-button:hover {
+            background: linear-gradient(135deg, rgba(14, 165, 233, 0.8), rgba(99, 102, 241, 0.8));
+            border-color: rgba(186, 230, 253, 0.8);
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+            transform: translateY(-2px);
+        }
+
+        .glass-button:active {
+            transform: translateY(1px);
+        }
+
+        /* Glowing Effects */
+        .neon-text-cyan {
+            text-shadow: 0 0 10px rgba(56, 189, 248, 0.7), 0 0 20px rgba(56, 189, 248, 0.5);
+        }
+
+        .neon-text-yellow {
+            text-shadow: 0 0 10px rgba(253, 224, 71, 0.7), 0 0 20px rgba(253, 224, 71, 0.5);
+        }
+
+        .neon-border {
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+        }
+
+        /* Pulse Animations */
+        @keyframes pulse-slow {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.03); opacity: 1; }
+        }
+
+        .animate-pulse-slow {
+            animation: pulse-slow 3s infinite ease-in-out;
+        }
+
+        /* Custom Scrollbar for Mission Select */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #0ea5e9;
+            border-radius: 3px;
+        }
+
+        /* Screen Shake Animation */
+        .shake {
+            animation: shakeAnim 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shakeAnim {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+
+        /* Camera PIP Video flip */
+        #webcamVideo {
+            transform: scaleX(-1);
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative bg-slate-950 overflow-hidden select-none">
+
+    <!-- GAME CANVAS (Background + Space Simulation) -->
+    <canvas id="gameCanvas" class="absolute inset-0 w-full h-full z-0"></canvas>
+
+    <!-- UI OVERLAY CONTAINER -->
+    <div id="uiContainer" class="absolute inset-0 z-10 flex flex-col pointer-events-none">
+        
+        <!-- NAVBAR OVERLAY (Top Bar) -->
+        <header id="navbar" class="w-full px-4 py-3 glass-panel flex justify-between items-center pointer-events-auto border-b border-cyan-500/30 hidden">
+            <!-- Left: Pilot Info -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-cyan-950 border border-cyan-400 flex items-center justify-center text-cyan-400 font-bold">
+                    <i class="fa-solid font-orbitron fa-user-astronaut text-xl"></i>
+                </div>
+                <div>
+                    <span class="text-xs text-cyan-400 tracking-wider uppercase font-semibold">Astronot IPAS</span>
+                    <h3 id="navPilotName" class="font-orbitron text-lg font-bold text-white leading-none">Kapten Rian</h3>
+                </div>
+            </div>
+
+            <!-- Middle: Mission Badge & Question Counter -->
+            <div class="flex flex-col items-center">
+                <div id="navMissionTitle" class="font-orbitron text-sm md:text-base font-extrabold text-cyan-300 tracking-wide neon-text-cyan">
+                    MISI 1: EVAPORASI & KONDENSASI
+                </div>
+                <div id="navQuestionProgress" class="text-xs text-slate-300 font-medium">
+                    Soal <span id="currentQNum" class="text-yellow-400 font-bold">1</span> dari 3 (<span id="lotsBadge" class="text-emerald-400 font-bold">LOTS</span>)
+                </div>
+            </div>
+
+            <!-- Right: Stats & Controls -->
+            <div class="flex items-center gap-4">
+                <!-- Hearts (Lives) -->
+                <div class="flex items-center gap-1 bg-slate-900/80 px-3 py-1.5 rounded-full border border-red-500/30">
+                    <i class="fa-solid fa-heart text-red-500 text-lg animate-pulse"></i>
+                    <span id="livesText" class="font-orbitron font-bold text-red-400 text-lg">3</span>
+                </div>
+
+                <!-- Score -->
+                <div class="flex items-center gap-2 bg-slate-900/80 px-3 py-1.5 rounded-full border border-yellow-500/30">
+                    <i class="fa-solid fa-trophy text-yellow-400 text-base"></i>
+                    <span id="scoreText" class="font-orbitron font-bold text-yellow-300 text-lg">0</span>
+                </div>
+
+                <!-- Camera Toggle Button -->
+                <button id="btnToggleCam" onclick="toggleCamera()" class="glass-button px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-bold text-cyan-200">
+                    <i id="camIcon" class="fa-solid fa-video-slash text-red-400"></i>
+                    <span id="camBtnText">Kamera AI</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN GAME HUD & QUESTION BOX -->
+        <div id="gameplayHud" class="flex-1 relative flex flex-col justify-between p-4 pointer-events-none hidden">
+            <!-- Question Box at Top -->
+            <div class="w-full max-w-4xl mx-auto glass-panel rounded-2xl p-4 md:p-5 border-2 border-cyan-500/40 pointer-events-auto text-center shadow-2xl relative overflow-hidden">
+                <div id="lotsIndicator" class="absolute top-2 left-4 px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                    Tingkat: LOTS (Mengingat)
+                </div>
+                <div class="absolute top-2 right-4 text-xs font-semibold text-cyan-400 flex items-center gap-1">
+                    <i class="fa-solid fa-hand-pointer"></i> Arahkan Pesawat ke Asteroid Jawaban
+                </div>
+                <p id="questionText" class="font-orbitron text-base md:text-xl font-bold text-white mt-4 mb-1 leading-snug">
+                    Memuat pertanyaan...
+                </p>
+            </div>
+
+            <!-- Bottom Control Hints / Gesture PIP Camera Box -->
+            <div class="w-full flex justify-between items-end pointer-events-auto">
+                <!-- Control Hints -->
+                <div class="glass-panel p-3 rounded-xl text-xs text-slate-300 flex flex-col gap-1 max-w-xs border-cyan-500/20">
+                    <div class="font-bold text-cyan-400 flex items-center gap-1">
+                        <i class="fa-solid fa-gamepad"></i> Kontrol Aktif:
+                    </div>
+                    <div>• <b>Kamera Gesture:</b> Gerakkan telapak tangan</div>
+                    <div>• <b>Mouse/Touch:</b> Geser kursor / sentuh layar</div>
+                    <div>• <b>Keyboard:</b> Gunakan Tombol Panah (&larr; &rarr; &uarr; &darr;)</div>
+                </div>
+
+                <!-- Camera PIP Box -->
+                <div id="cameraPipContainer" class="relative w-36 h-28 rounded-xl overflow-hidden glass-panel border border-cyan-400/40 shadow-lg hidden">
+                    <video id="webcamVideo" class="w-full h-full object-cover" autoplay playsinline muted></video>
+                    <canvas id="gestureCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+                    <div id="camStatusBadge" class="absolute bottom-1 left-1 right-1 bg-black/70 text-[9px] text-center text-cyan-300 font-mono py-0.5 rounded">
+                        Kamera Offline
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCREENS OVERLAY CONTAINER (Modals, Start, Victory, Game Over) -->
+    <div id="screensContainer" class="absolute inset-0 z-20 flex items-center justify-center p-4">
+        
+        <!-- 1. WELCOME / PILOT REGISTER SCREEN -->
+        <div id="welcomeScreen" class="w-full max-w-lg glass-panel p-6 md:p-8 rounded-3xl text-center border-2 border-cyan-500/50 shadow-2xl relative animate-pulse-slow">
+            <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-cyan-500/20 border-2 border-cyan-400 flex items-center justify-center text-cyan-300 shadow-lg shadow-cyan-500/30">
+                <i class="fa-solid fa-rocket text-4xl"></i>
+            </div>
+            <h1 class="font-orbitron text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-200 to-indigo-300 mb-1">
+                SPACE MISSION
+            </h1>
+            <h2 class="font-orbitron text-sm md:text-base font-bold text-cyan-400 tracking-widest uppercase mb-4">
+                Petualangan Luar Angkasa • Siklus Air IPAS
+            </h2>
+            <p class="text-slate-300 text-sm mb-6 leading-relaxed">
+                Halo Calon Astronot! Bantu Galaksi mempelajari Siklus Air di Bumi. Kemudikan pesawatmu untuk menabrak asteroid jawaban yang benar!
+            </p>
+
+            <form onsubmit="submitPilotName(event)" class="flex flex-col gap-4 text-left">
+                <div>
+                    <label class="block text-xs font-bold text-cyan-300 uppercase tracking-wider mb-2">Masukkan Nama Astronot:</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user-astronaut absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400"></i>
+                        <input type="text" id="inputPilotName" required maxlength="18" placeholder="Contoh: Budi Santoso"
+                            class="w-full bg-slate-900/90 border-2 border-cyan-500/40 rounded-xl py-3 pl-11 pr-4 text-white font-semibold focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/50 transition">
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700/60 text-xs text-slate-300 flex items-start gap-2">
+                    <i class="fa-solid fa-circle-info text-cyan-400 mt-0.5"></i>
+                    <span>Kamu bisa mengendalikan pesawat menggunakan <b>Kamera AI (Gerakan Tangan)</b>, <b>Mouse/Touch</b>, atau <b>Tombol Panah Keyboard</b>.</span>
+                </div>
+
+                <button type="submit" class="glass-button w-full py-3.5 rounded-xl font-orbitron font-extrabold text-base text-white tracking-wider uppercase shadow-lg shadow-cyan-500/30 mt-2">
+                    Mulai Misi Luar Angkasa <i class="fa-solid fa-paper-plane ml-2"></i>
+                </button>
+            </form>
+        </div>
+
+        <!-- 2. MISSION SELECT MODAL -->
+        <div id="missionSelectScreen" class="w-full max-w-3xl glass-panel p-6 md:p-8 rounded-3xl text-center border-2 border-cyan-500/40 shadow-2xl hidden">
+            <h2 class="font-orbitron text-2xl md:text-3xl font-black text-cyan-300 mb-1">PILIH MISI JELAJAH</h2>
+            <p class="text-xs md:text-sm text-slate-300 mb-6">Selesaikan setiap misi secara berurutan untuk membuka sektor berikutnya!</p>
+
+            <div id="missionsList" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto pr-1">
+                <!-- Mission Cards Rendered Dynamically via JS -->
+            </div>
+        </div>
+
+        <!-- 3. FEEDBACK MODAL OVERLAY (Correct / Incorrect) -->
+        <div id="feedbackModal" class="w-full max-w-md glass-panel p-6 rounded-3xl text-center border-2 border-cyan-400 shadow-2xl hidden transform transition-all duration-300 scale-90">
+            <div id="feedbackIconContainer" class="w-20 h-20 mx-auto mb-3 rounded-full flex items-center justify-center text-4xl shadow-lg">
+                <i id="feedbackIcon" class="fa-solid fa-check"></i>
+            </div>
+            <h3 id="feedbackTitle" class="font-orbitron text-2xl font-black mb-2">JAWABAN BENAR!</h3>
+            <p id="feedbackExplanation" class="text-sm text-slate-200 mb-6 leading-relaxed">
+                Penjelasan interaktif mengenai konsep siklus air akan muncul di sini.
+            </p>
+            <button onclick="closeFeedbackModal()" class="glass-button w-full py-3 rounded-xl font-orbitron font-bold text-sm text-white uppercase tracking-wider">
+                Lanjutkan Misi <i class="fa-solid fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+
+        <!-- 4. GAME OVER MODAL -->
+        <div id="gameOverScreen" class="w-full max-w-md glass-panel p-6 rounded-3xl text-center border-2 border-red-500/60 shadow-2xl hidden">
+            <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center text-red-400 shadow-lg shadow-red-500/30">
+                <i class="fa-solid fa-triangle-exclamation text-4xl"></i>
+            </div>
+            <h2 class="font-orbitron text-2xl font-black text-red-400 mb-2">PESAWAT RUSAK!</h2>
+            <p class="text-sm text-slate-300 mb-6">
+                Kesempatanmu telah habis. Jangan berkecil hati, pelajari kembali konsep Siklus Air dan coba lagi!
+            </p>
+            <div class="flex gap-3">
+                <button onclick="retryCurrentMission()" class="glass-button flex-1 py-3 rounded-xl font-orbitron font-bold text-sm text-white uppercase tracking-wider">
+                    <i class="fa-solid fa-rotate-left mr-1"></i> Coba Lagi
+                </button>
+                <button onclick="showMissionSelect()" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 flex-1 py-3 rounded-xl font-orbitron font-bold text-sm text-slate-200 uppercase tracking-wider transition">
+                    Pilih Misi
+                </button>
+            </div>
+        </div>
+
+        <!-- 5. VICTORY / CERTIFICATE SCREEN -->
+        <div id="victoryScreen" class="w-full max-w-2xl glass-panel p-6 md:p-8 rounded-3xl text-center border-2 border-yellow-400 shadow-2xl hidden">
+            <div class="w-24 h-24 mx-auto mb-3 rounded-full bg-yellow-500/20 border-2 border-yellow-400 flex items-center justify-center text-yellow-300 shadow-lg shadow-yellow-500/40">
+                <i class="fa-solid fa-award text-5xl animate-bounce"></i>
+            </div>
+            <h2 class="font-orbitron text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-500 mb-1">
+                SELAMAT! MISI SUKSES
+            </h2>
+            <h3 class="text-cyan-300 font-bold text-sm mb-4">Lencana Penghargaan Galaksi IPAS</h3>
+
+            <div class="bg-slate-900/80 rounded-2xl p-4 border border-yellow-500/30 mb-6 text-left space-y-2">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="text-xs text-slate-400 uppercase font-semibold">Nama Astronot:</span>
+                    <span id="victoryPilotName" class="font-orbitron font-bold text-lg text-white">Kapten Rian</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="text-xs text-slate-400 uppercase font-semibold">Total Poin Pembelajaran:</span>
+                    <span id="victoryTotalScore" class="font-orbitron font-bold text-xl text-yellow-400">1500 / 1500</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="text-xs text-slate-400 uppercase font-semibold">Gelar Pencapaian:</span>
+                    <span class="font-orbitron font-bold text-sm text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/40">
+                        <i class="fa-solid fa-star mr-1"></i> Master Siklus Air Bumi
+                    </span>
+                </div>
+                <p id="victoryApreciationText" class="text-xs text-slate-300 italic pt-1">
+                    "Hebat sekali, [Nama]! Kamu telah menguasai seluruh tahapan Siklus Air, dari Evaporasi hingga Infiltrasi dan dampaknya bagi lingkungan."
+                </p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3">
+                <button onclick="restartFullGame()" class="glass-button flex-1 py-3.5 rounded-xl font-orbitron font-extrabold text-sm text-white uppercase tracking-wider">
+                    <i class="fa-solid fa-rotate mr-2"></i> Main Lagi dari Awal
+                </button>
+                <button onclick="showMissionSelect()" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 flex-1 py-3.5 rounded-xl font-orbitron font-bold text-sm text-slate-200 uppercase tracking-wider transition">
+                    <i class="fa-solid fa-list-check mr-2"></i> Menu Pilih Misi
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JAVASCRIPT GAME LOGIC & AUDIO SYNTHESIS -->
+    <script>
+        /* ==========================================================================
+           1. GAME DATA & EDUCATIONAL CONTENT (15 Questions, 5 Missions)
+           ========================================================================== */
+        const GAME_MISSIONS = [
+            {
+                id: 1,
+                title: "MISI 1: EVAPORASI & KONDENSASI",
+                desc: "Pengenalan penguapan air dan pembentukan awan",
+                unlocked: true,
+                questions: [
+                    {
+                        level: "LOTS",
+                        levelBadge: "LOTS (Mengingat)",
+                        text: "Apa istilah untuk peristiwa penguapan air dari laut, sungai, dan danau akibat panas matahari?",
+                        options: [
+                            { text: "A. Evaporasi", correct: true },
+                            { text: "B. Kondensasi", correct: false },
+                            { text: "C. Presipitasi", correct: false }
+                        ],
+                        explanation: "BENAR! Evaporasi adalah proses perubahan air wujud cair menjadi uap air akibat energi panas matahari."
+                    },
+                    {
+                        level: "MOTS",
+                        levelBadge: "MOTS (Menerapkan)",
+                        text: "Saat uap air naik ke atmosfer yang dingin, uap air mengembun menjadi titik-titik air pembentuk awan. Proses ini adalah...",
+                        options: [
+                            { text: "A. Transpirasi", correct: false },
+                            { text: "B. Kondensasi", correct: true },
+                            { text: "C. Infiltrasi", correct: false }
+                        ],
+                        explanation: "TEPAT! Kondensasi adalah proses pengembunan uap air menjadi titik-titik air kecil yang berkumpul membentuk awan."
+                    },
+                    {
+                        level: "HOTS",
+                        levelBadge: "HOTS (Menganalisis)",
+                        text: "Mengapa jumlah total air di bumi secara umum selalu relatif tetap meskipun terus digunakannya setiap hari?",
+                        options: [
+                            { text: "A. Air terus mengalami siklus alami yang berputar berulang", correct: true },
+                            { text: "B. Gunung berapi selalu menambah air baru", correct: false },
+                            { text: "C. Hujan membawa air baru dari luar angkasa", correct: false }
+                        ],
+                        explanation: "HEBAT! Air tidak pernah habis karena terus bergerak dalam Siklus Air (berubah wujud dan berpindah tempat secara berkelanjutan)."
+                    }
+                ]
+            },
+            {
+                id: 2,
+                title: "MISI 2: PRESIPITASI & HUJAN",
+                desc: "Proses jatuhnya air hujan ke bumi dan faktor cuaca",
+                unlocked: false,
+                questions: [
+                    {
+                        level: "LOTS",
+                        levelBadge: "LOTS (Mengingat)",
+                        text: "Peristiwa jatuhnya titik-titik air dari awan menuju ke permukaan bumi disebut...",
+                        options: [
+                            { text: "A. Infiltrasi", correct: false },
+                            { text: "B. Presipitasi", correct: true },
+                            { text: "C. Evaporasi", correct: false }
+                        ],
+                        explanation: "BENAR! Presipitasi adalah segala bentuk curahan air dari atmosfer ke permukaan bumi (seperti hujan, salju, atau es)."
+                    },
+                    {
+                        level: "MOTS",
+                        levelBadge: "MOTS (Menerapkan)",
+                        text: "Ketika awan sudah sangat jenuh dan tidak mampu lagi menampung uap air, apa yang terjadi selanjutnya?",
+                        options: [
+                            { text: "A. Hujan (Presipitasi) akan turun ke bumi", correct: true },
+                            { text: "B. Laut akan mendadak kering", correct: false },
+                            { text: "C. Angin berhenti bertiup selamanya", correct: false }
+                        ],
+                        explanation: "TEPAT! Kejenuhan uap air di awan memicu terjadinya hujan (presipitasi)."
+                    },
+                    {
+                        level: "HOTS",
+                        levelBadge: "HOTS (Menganalisis)",
+                        text: "Di kawasan pegunungan tinggi bersuhu di bawah 0°C, presipitasi berbentuk salju/es. Apa analisis utamanya?",
+                        options: [
+                            { text: "A. Suhu dingin membekukan titik air awan sebelum mencapai tanah", correct: true },
+                            { text: "B. Angin di gunung terlalu kencang membakar air", correct: false },
+                            { text: "C. Pohon di gunung menolak air hujan cair", correct: false }
+                        ],
+                        explanation: "LUAR BIASA! Suhu atmosfer yang sangat rendah membuat kristal air membeku menjadi salju atau es sebelum jatuh."
+                    }
+                ]
+            },
+            {
+                id: 3,
+                title: "MISI 3: INFILTRASI & AIR TANAH",
+                desc: "Penyerapan air hujan ke tanah dan limpasan",
+                unlocked: false,
+                questions: [
+                    {
+                        level: "LOTS",
+                        levelBadge: "LOTS (Mengingat)",
+                        text: "Proses penyerapan dan masuknya air hujan ke dalam pori-pori tanah disebut...",
+                        options: [
+                            { text: "A. Infiltrasi", correct: true },
+                            { text: "B. Evaporasi", correct: false },
+                            { text: "C. Kondensasi", correct: false }
+                        ],
+                        explanation: "BENAR! Infiltrasi adalah perembesan air hujan dari permukaan ke dalam lapisan tanah."
+                    },
+                    {
+                        level: "MOTS",
+                        levelBadge: "MOTS (Menerapkan)",
+                        text: "Bagaimana akar pepohonan di hutan membantu meningkatkan proses infiltrasi air hujan?",
+                        options: [
+                            { text: "A. Akar membuat tanah gembur dan berpori sehingga air mudah meresap", correct: true },
+                            { text: "B. Akar menyerap air lalu membuangnya ke udara", correct: false },
+                            { text: "C. Akar menutup tanah rapat-rapat agar air meluncur cepat", correct: false }
+                        ],
+                        explanation: "TEPAT! Akar tanaman memperfungsikan pori tanah dan menjaga struktur tanah tetap gembur untuk menyerap air."
+                    },
+                    {
+                        level: "HOTS",
+                        levelBadge: "HOTS (Evaluasi)",
+                        text: "Kota yang dilapisi aspal dan beton sering banjir saat hujan deras. Mengapa hal ini terjadi?",
+                        options: [
+                            { text: "A. Infiltrasi terhalang beton sehingga limpasan permukaan meluap", correct: true },
+                            { text: "B. Evaporasi berhenti total di daerah perkotaan", correct: false },
+                            { text: "C. Hujan di kota selalu 100 kali lebih deras", correct: false }
+                        ],
+                        explanation: "ANALISIS AKURAT! Lapisan kedap air (beton/aspal) mencegah infiltrasi, membuat air terkumpul di permukaan sebagai limpasan penyebebab banjir."
+                    }
+                ]
+            },
+            {
+                id: 4,
+                title: "MISI 4: TRANSPIRASI & DAMPAK LINGKUNGAN",
+                desc: "Peran tumbuhan dan aktivitas manusia pada air",
+                unlocked: false,
+                questions: [
+                    {
+                        level: "LOTS",
+                        levelBadge: "LOTS (Mengingat)",
+                        text: "Proses penguapan air yang berasal dari jaringan makhluk hidup (tumbuhan) dinamakan...",
+                        options: [
+                            { text: "A. Transpirasi", correct: true },
+                            { text: "B. Presipitasi", correct: false },
+                            { text: "C. Sublimasi", correct: false }
+                        ],
+                        explanation: "BENAR! Transpirasi adalah pelepasan uap air oleh jaringan tanaman terutama melalui daun."
+                    },
+                    {
+                        level: "MOTS",
+                        levelBadge: "MOTS (Menerapkan)",
+                        text: "Apa dampak pembalakan hutan (penebangan liar) secara luas terhadap kelembapan udara lingkungan sekitar?",
+                        options: [
+                            { text: "A. Kelembapan berkurang karena transpirasi tanaman menurun drastis", correct: true },
+                            { text: "B. Udara menjadi sangat lembap dan sering hujan", correct: false },
+                            { text: "C. Air sungai melimpah sepanjang tahun", correct: false }
+                        ],
+                        explanation: "TEPAT! Penebangan pohon mengurangi populasi daun yang melalukan transpirasi, menurukankan kadar uap air di udara."
+                    },
+                    {
+                        level: "HOTS",
+                        levelBadge: "HOTS (Evaluasi)",
+                        text: "Evaluasi dampak jangka panjang penebangan hutan hujan terhadap cadangan air tanah di musim kemarau!",
+                        options: [
+                            { text: "A. Cadangan air tanah menipis/kering karena infiltrasi menurun tanpa akar", correct: true },
+                            { text: "B. Air tanah semakin bertambah banyak melimpah", correct: false },
+                            { text: "C. Siklus air berhenti total di seluruh planet", correct: false }
+                        ],
+                        explanation: "ANALISIS BAGUS! Tanpa pohon, air hujan langsung mengalir ke laut tanpa diserap tanah, menyebabkan kekeringan di musim kemarau."
+                    }
+                ]
+            },
+            {
+                id: 5,
+                title: "MISI 5: TANTANGAN KOMPREHENSIF",
+                desc: "Evaluasi menyeluruh siklus air dan solusi lingkungan",
+                unlocked: false,
+                questions: [
+                    {
+                        level: "LOTS",
+                        levelBadge: "LOTS (Mengingat)",
+                        text: "Urutan tahapan siklus air yang benar secara mendasar adalah...",
+                        options: [
+                            { text: "A. Evaporasi -> Kondensasi -> Presipitasi -> Infiltrasi", correct: true },
+                            { text: "B. Presipitasi -> Evaporasi -> Kondensasi -> Transpirasi", correct: false },
+                            { text: "C. Infiltrasi -> Presipitasi -> Evaporasi -> Kondensasi", correct: false }
+                        ],
+                        explanation: "SEMPURNA! Urutan dasar: Penguapan (Evaporasi) -> Pengembunan (Kondensasi) -> Hujan (Presipitasi) -> Penyerapan (Infiltrasi)."
+                    },
+                    {
+                        level: "MOTS",
+                        levelBadge: "MOTS (Menerapkan)",
+                        text: "Mengapa Matahari dianggap sebagai sumber energi utama penggerak seluruh siklus air di Bumi?",
+                        options: [
+                            { text: "A. Energi panas matahari menguapkan air di permukaan bumi", correct: true },
+                            { text: "B. Sinar matahari mendorong awan terbang di langit", correct: false },
+                            { text: "C. Gravitasi matahari menarik air laut ke atas", correct: false }
+                        ],
+                        explanation: "TEPAT! Panas matahari memberi energi termal untuk mengubah air cair menjadi uap air."
+                    },
+                    {
+                        level: "HOTS",
+                        levelBadge: "HOTS (Solusi Problem Solving)",
+                        text: "Solusi berbasis prinsip siklus air untuk mengatasi krisis air bersih desa saat kemarau adalah...",
+                        options: [
+                            { text: "A. Membuat sumur resapan / biopori untuk menampung air hujan", correct: true },
+                            { text: "B. Menutup seluruh permukaan tanah desa menggunakan semen", correct: false },
+                            { text: "C. Mengalirkan seluruh air sungai langsung menuju ke laut", correct: false }
+                        ],
+                        explanation: "LUAR BIASA ASTRONOT! Lubang biopori/sumur resapan memaksimalkan infiltrasi air hujan untuk disimpan sebagai cadangan air tanah!"
+                    }
+                ]
+            }
+        ];
+
+        /* ==========================================================================
+           2. SOUND SYNTHESIZER (Web Audio API - No External Files)
+           ========================================================================== */
+        class AudioController {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playCorrect() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.1); // E5
+                osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.2); // G5
+                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.35); // C6
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+
+            playWrong() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now); // A3
+                osc.frequency.linearRampToValueAtTime(130, now + 0.3); // C3
+
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            }
+
+            playCollision() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            playVictory() {
+                this.init();
+                const notes = [523.25, 659.25, 783.99, 1046.50, 880, 1046.50];
+                const times = [0, 0.15, 0.3, 0.45, 0.65, 0.85];
+                
+                times.forEach((t, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    const now = this.ctx.currentTime + t;
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(notes[i], now);
+
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                });
+            }
+        }
+
+        const audioFX = new AudioController();
+
+        /* ==========================================================================
+           3. GAME STATE MANAGEMENT
+           ========================================================================== */
+        const state = {
+            pilotName: "Astronot",
+            currentMissionIdx: 0,
+            currentQuestionIdx: 0,
+            score: 0,
+            lives: 3,
+            isPlaying: false,
+            cameraActive: false,
+            handPosition: { x: 0.5, y: 0.8 }, // Normalized (0-1)
+            keysPressed: {}
+        };
+
+        /* ==========================================================================
+           4. CANVAS 2D RENDERER & GAME OBJECTS
+           ========================================================================== */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Background Starfield Generation
+        const stars = Array.from({ length: 150 }, () => ({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            size: Math.random() * 2 + 0.5,
+            speed: Math.random() * 1.5 + 0.5,
+            alpha: Math.random()
+        }));
+
+        // Particles for explosions and thrusters
+        let particles = [];
+
+        function createParticles(x, y, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 4 + 1;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    decay: Math.random() * 0.03 + 0.02,
+                    color: color,
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        // Spaceship Object
+        const ship = {
+            x: canvas.width / 2,
+            y: canvas.height * 0.8,
+            targetX: canvas.width / 2,
+            targetY: canvas.height * 0.8,
+            width: 50,
+            height: 60,
+            speed: 0.15, // Smooth interpolation factor
+
+            update() {
+                // Keyboard Fallback smooth movement
+                const kbSpeed = 12;
+                if (state.keysPressed['ArrowLeft'] || state.keysPressed['a']) this.targetX -= kbSpeed;
+                if (state.keysPressed['ArrowRight'] || state.keysPressed['d']) this.targetX += kbSpeed;
+                if (state.keysPressed['ArrowUp'] || state.keysPressed['w']) this.targetY -= kbSpeed;
+                if (state.keysPressed['ArrowDown'] || state.keysPressed['s']) this.targetY += kbSpeed;
+
+                // Clamp targets inside canvas bounds
+                this.targetX = Math.max(30, Math.min(canvas.width - 30, this.targetX));
+                this.targetY = Math.max(120, Math.min(canvas.height - 40, this.targetY));
+
+                // Linear Interpolation for smooth motion
+                this.x += (this.targetX - this.x) * this.speed;
+                this.y += (this.targetY - this.y) * this.speed;
+
+                // Thruster particle trail
+                if (state.isPlaying && Math.random() > 0.3) {
+                    particles.push({
+                        x: this.x + (Math.random() * 12 - 6),
+                        y: this.y + 25,
+                        vx: (Math.random() - 0.5) * 1,
+                        vy: Math.random() * 3 + 2,
+                        life: 1,
+                        decay: 0.08,
+                        color: '#38bdf8',
+                        size: Math.random() * 3 + 1
+                    });
+                }
+            },
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Spaceship Glow
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#0ea5e9';
+
+                // Ship Body Outer Wings
+                ctx.fillStyle = '#0284c7';
+                ctx.beginPath();
+                ctx.moveTo(0, -30);
+                ctx.lineTo(-28, 20);
+                ctx.lineTo(-12, 15);
+                ctx.lineTo(0, 25);
+                ctx.lineTo(12, 15);
+                ctx.lineTo(28, 20);
+                ctx.closePath();
+                ctx.fill();
+
+                // Inner Main Hull
+                ctx.fillStyle = '#f8fafc';
+                ctx.beginPath();
+                ctx.moveTo(0, -28);
+                ctx.lineTo(-15, 12);
+                ctx.lineTo(0, 18);
+                ctx.lineTo(15, 12);
+                ctx.closePath();
+                ctx.fill();
+
+                // Cockpit Glass
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.ellipse(0, -5, 7, 12, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        };
+
+        // Asteroid Answer Choices Class
+        class AsteroidOption {
+            constructor(optionData, index, total) {
+                this.option = optionData;
+                this.radius = 45;
+                // Distribute evenly horizontally across screen
+                const spacing = canvas.width / (total + 1);
+                this.x = spacing * (index + 1);
+                this.y = -80 - (index * 40); // Staggered spawn heights
+                this.speed = 1.8 + Math.random() * 0.8;
+                this.rotation = 0;
+                this.rotSpeed = (Math.random() - 0.5) * 0.02;
+
+                // Jagged shape offset generation
+                this.shapePoints = [];
+                const sides = 8;
+                for (let i = 0; i < sides; i++) {
+                    const angle = (i / sides) * Math.PI * 2;
+                    const r = this.radius * (0.85 + Math.random() * 0.3);
+                    this.shapePoints.push({
+                        x: Math.cos(angle) * r,
+                        y: Math.sin(angle) * r
+                    });
+                }
+            }
+
+            update() {
+                this.y += this.speed;
+                this.rotation += this.rotSpeed;
+
+                // Loop back to top if off bottom screen
+                if (this.y - this.radius > canvas.height) {
+                    this.y = -80;
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+
+                // Glowing Border
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = '#38bdf8';
+
+                // Asteroid Base Texture Shape
+                ctx.fillStyle = '#1e293b';
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 2.5;
+
+                ctx.beginPath();
+                ctx.moveTo(this.shapePoints[0].x, this.shapePoints[0].y);
+                for (let i = 1; i < this.shapePoints.length; i++) {
+                    ctx.lineTo(this.shapePoints[i].x, this.shapePoints[i].y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.restore();
+
+                // Draw Text Label OVER unrotated canvas to ensure readability
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                ctx.font = 'bold 13px Orbitron, sans-serif';
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                // Wrap text if needed inside asteroid
+                const words = this.option.text.split(' ');
+                let line = '';
+                let lines = [];
+                for (let n = 0; n < words.length; n++) {
+                    let testLine = line + words[n] + ' ';
+                    let metrics = ctx.measureText(testLine);
+                    if (metrics.width > this.radius * 1.6 && n > 0) {
+                        lines.push(line);
+                        line = words[n] + ' ';
+                    } else {
+                        line = testLine;
+                    }
+                }
+                lines.push(line);
+
+                const lineHeight = 14;
+                const startY = -((lines.length - 1) * lineHeight) / 2;
+                lines.forEach((l, idx) => {
+                    ctx.fillText(l.trim(), 0, startY + idx * lineHeight);
+                });
+
+                ctx.restore();
+            }
+
+            checkCollision(shipObj) {
+                const dist = Math.hypot(this.x - shipObj.x, this.y - shipObj.y);
+                return dist < (this.radius + shipObj.width / 2.5);
+            }
+        }
+
+        let currentAsteroids = [];
+
+        function spawnAsteroidsForCurrentQuestion() {
+            currentAsteroids = [];
+            const q = GAME_MISSIONS[state.currentMissionIdx].questions[state.currentQuestionIdx];
+            q.options.forEach((opt, idx) => {
+                currentAsteroids.push(new AsteroidOption(opt, idx, q.options.length));
+            });
+        }
+
+        /* ==========================================================================
+           5. MAIN CANVAS ANIMATION LOOP
+           ========================================================================== */
+        function gameLoop() {
+            // Clear & Draw Deep Space Background
+            ctx.fillStyle = '#030712';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Nebula background dynamic gradient
+            const time = Date.now() * 0.0005;
+            const gradX = canvas.width / 2 + Math.cos(time) * 100;
+            const gradY = canvas.height / 2 + Math.sin(time) * 100;
+            const bgGradient = ctx.createRadialGradient(gradX, gradY, 50, canvas.width / 2, canvas.height / 2, canvas.width * 0.8);
+            bgGradient.addColorStop(0, 'rgba(14, 165, 233, 0.08)');
+            bgGradient.addColorStop(0.5, 'rgba(99, 102, 241, 0.04)');
+            bgGradient.addColorStop(1, 'rgba(3, 7, 18, 0)');
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Render Stars
+            stars.forEach(star => {
+                star.y += star.speed;
+                if (star.y > canvas.height) star.y = 0;
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Update & Render Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= p.decay;
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                } else {
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.life;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                }
+            }
+
+            // Gameplay State Updates
+            if (state.isPlaying) {
+                ship.update();
+                ship.draw();
+
+                // Update Asteroids & Check Collision
+                for (let i = currentAsteroids.length - 1; i >= 0; i--) {
+                    const ast = currentAsteroids[i];
+                    ast.update();
+                    ast.draw();
+
+                    if (ast.checkCollision(ship)) {
+                        audioFX.playCollision();
+                        handleAnswerSelection(ast.option);
+                        break;
+                    }
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        /* ==========================================================================
+           6. GESTURE RECOGNITION (MediaPipe Hands API) & FALLBACK CONTROLS
+           ========================================================================== */
+        let hands = null;
+        let camera = null;
+
+        function initMediaPipe() {
+            const videoElement = document.getElementById('webcamVideo');
+            const gestureCanvas = document.getElementById('gestureCanvas');
+            const gCtx = gestureCanvas.getContext('2d');
+            const statusBadge = document.getElementById('camStatusBadge');
+
+            hands = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.6,
+                minTrackingConfidence: 0.6
+            });
+
+            hands.onResults((results) => {
+                gCtx.clearRect(0, 0, gestureCanvas.width, gestureCanvas.height);
+
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    const landmarks = results.multiHandLandmarks[0];
+                    statusBadge.innerText = "Tangan Terdeteksi!";
+                    statusBadge.className = "absolute bottom-1 left-1 right-1 bg-emerald-950/80 text-[9px] text-center text-emerald-400 font-mono py-0.5 rounded border border-emerald-500/40";
+
+                    // Index Finger Tip (Landmark 8) or Wrist (0)
+                    const indexTip = landmarks[8];
+                    // Mirror X coordinate because webcam preview is flipped horizontally
+                    const normalizedX = 1 - indexTip.x;
+                    const normalizedY = indexTip.y;
+
+                    state.handPosition.x = normalizedX;
+                    state.handPosition.y = normalizedY;
+
+                    // Direct ship targets
+                    ship.targetX = normalizedX * canvas.width;
+                    ship.targetY = normalizedY * canvas.height;
+
+                    // Draw landmark point indicator on PIP
+                    gCtx.fillStyle = '#38bdf8';
+                    gCtx.beginPath();
+                    gCtx.arc(indexTip.x * gestureCanvas.width, indexTip.y * gestureCanvas.height, 6, 0, Math.PI * 2);
+                    gCtx.fill();
+                } else {
+                    statusBadge.innerText = "Mencari Tangan...";
+                    statusBadge.className = "absolute bottom-1 left-1 right-1 bg-amber-950/80 text-[9px] text-center text-amber-300 font-mono py-0.5 rounded border border-amber-500/40";
+                }
+            });
+
+            camera = new Camera(videoElement, {
+                onFrame: async () => {
+                    if (state.cameraActive) {
+                        await hands.send({ image: videoElement });
+                    }
+                },
+                width: 320,
+                height: 240
+            });
+        }
+
+        function toggleCamera() {
+            const btnText = document.getElementById('camBtnText');
+            const camIcon = document.getElementById('camIcon');
+            const pipContainer = document.getElementById('cameraPipContainer');
+
+            if (!state.cameraActive) {
+                if (!camera) initMediaPipe();
+                camera.start().then(() => {
+                    state.cameraActive = true;
+                    btnText.innerText = "Kamera Aktif";
+                    camIcon.className = "fa-solid fa-video text-emerald-400 animate-pulse";
+                    pipContainer.classList.remove('hidden');
+                }).catch(err => {
+                    alert("Gagal mengakses kamera. Gunakan mouse/touch/keyboard sebagai alternatif.");
+                    console.error("Webcam Error:", err);
+                });
+            } else {
+                if (camera) camera.stop();
+                state.cameraActive = false;
+                btnText.innerText = "Kamera AI";
+                camIcon.className = "fa-solid fa-video-slash text-red-400";
+                pipContainer.classList.add('hidden');
+            }
+        }
+
+        // Mouse & Touch Movement Listeners
+        window.addEventListener('mousemove', (e) => {
+            if (state.isPlaying && !state.cameraActive) {
+                ship.targetX = e.clientX;
+                ship.targetY = e.clientY;
+            }
+        });
+
+        window.addEventListener('touchmove', (e) => {
+            if (state.isPlaying && !state.cameraActive && e.touches.length > 0) {
+                ship.targetX = e.touches[0].clientX;
+                ship.targetY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        // Keyboard Arrow Movement Listeners
+        window.addEventListener('keydown', (e) => {
+            state.keysPressed[e.key] = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            state.keysPressed[e.key] = false;
+        });
+
+        /* ==========================================================================
+           7. GAME LOGIC & FLOW CONTROL
+           ========================================================================== */
+        function submitPilotName(event) {
+            event.preventDefault();
+            const inputVal = document.getElementById('inputPilotName').value.trim();
+            if (inputVal) {
+                state.pilotName = inputVal;
+                document.getElementById('navPilotName').innerText = state.pilotName;
+                document.getElementById('welcomeScreen').classList.add('hidden');
+                showMissionSelect();
+            }
+        }
+
+        function renderMissionSelectCards() {
+            const container = document.getElementById('missionsList');
+            container.innerHTML = '';
+
+            GAME_MISSIONS.forEach((mission, index) => {
+                const isUnlocked = mission.unlocked;
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-2xl border transition-all text-left flex flex-col justify-between ${
+                    isUnlocked 
+                    ? 'bg-slate-900/80 border-cyan-500/50 hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/20 cursor-pointer' 
+                    : 'bg-slate-950/40 border-slate-800 opacity-60 cursor-not-allowed'
+                }`;
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-orbitron font-extrabold text-sm ${isUnlocked ? 'text-cyan-300' : 'text-slate-500'}">
+                                ${mission.title}
+                            </span>
+                            <i class="fa-solid ${isUnlocked ? 'fa-unlock-keyhole text-emerald-400' : 'fa-lock text-slate-600'}"></i>
+                        </div>
+                        <p class="text-xs text-slate-400 mb-3">${mission.desc}</p>
+                    </div>
+                    <div class="flex justify-between items-center text-[11px] font-semibold">
+                        <span class="text-slate-500">3 Pertanyaan (LOTS/MOTS/HOTS)</span>
+                        ${isUnlocked 
+                            ? `<button onclick="startMission(${index})" class="px-3 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500 hover:text-white transition">Mulai <i class="fa-solid fa-play ml-1"></i></button>`
+                            : `<span class="text-slate-600">Terkunci</span>`
+                        }
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function showMissionSelect() {
+            state.isPlaying = false;
+            document.getElementById('navbar').classList.add('hidden');
+            document.getElementById('gameplayHud').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('victoryScreen').classList.add('hidden');
+            document.getElementById('feedbackModal').classList.add('hidden');
+
+            renderMissionSelectCards();
+            document.getElementById('missionSelectScreen').classList.remove('hidden');
+        }
+
+        function startMission(missionIndex) {
+            state.currentMissionIdx = missionIndex;
+            state.currentQuestionIdx = 0;
+            state.lives = 3;
+            state.isPlaying = true;
+
+            document.getElementById('missionSelectScreen').classList.add('hidden');
+            document.getElementById('navbar').classList.remove('hidden');
+            document.getElementById('gameplayHud').classList.remove('hidden');
+
+            updateUiStats();
+            loadCurrentQuestion();
+        }
+
+        function loadCurrentQuestion() {
+            const mission = GAME_MISSIONS[state.currentMissionIdx];
+            const q = mission.questions[state.currentQuestionIdx];
+
+            // Navbar Updates
+            document.getElementById('navMissionTitle').innerText = mission.title;
+            document.getElementById('currentQNum').innerText = state.currentQuestionIdx + 1;
+            document.getElementById('lotsBadge').innerText = q.level;
+
+            // Question Box Updates
+            document.getElementById('questionText').innerText = q.text;
+            document.getElementById('lotsIndicator').innerText = `Tingkat: ${q.levelBadge}`;
+
+            // Spawn asteroids on canvas
+            spawnAsteroidsForCurrentQuestion();
+        }
+
+        function updateUiStats() {
+            document.getElementById('scoreText').innerText = state.score;
+            document.getElementById('livesText').innerText = state.lives;
+        }
+
+        function handleAnswerSelection(selectedOption) {
+            state.isPlaying = false; // Pause gameplay physics
+            const q = GAME_MISSIONS[state.currentMissionIdx].questions[state.currentQuestionIdx];
+
+            const modal = document.getElementById('feedbackModal');
+            const title = document.getElementById('feedbackTitle');
+            const iconContainer = document.getElementById('feedbackIconContainer');
+            const icon = document.getElementById('feedbackIcon');
+            const exp = document.getElementById('feedbackExplanation');
+
+            if (selectedOption.correct) {
+                // Correct Answer
+                audioFX.playCorrect();
+                state.score += 100;
+                updateUiStats();
+                createParticles(ship.x, ship.y, '#34d399', 30);
+
+                title.innerText = "JAWABAN BENAR! (+100 Poin)";
+                title.className = "font-orbitron text-2xl font-black text-emerald-400 mb-2";
+                iconContainer.className = "w-20 h-20 mx-auto mb-3 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400 text-4xl shadow-lg shadow-emerald-500/30";
+                icon.className = "fa-solid fa-circle-check";
+                exp.innerText = q.explanation;
+            } else {
+                // Incorrect Answer
+                audioFX.playWrong();
+                state.lives -= 1;
+                updateUiStats();
+                createParticles(ship.x, ship.y, '#f87171', 30);
+
+                // Screen shake feedback
+                document.body.classList.add('shake');
+                setTimeout(() => document.body.classList.remove('shake'), 400);
+
+                title.innerText = "JAWABAN KURANG TEPAT!";
+                title.className = "font-orbitron text-2xl font-black text-red-400 mb-2";
+                iconContainer.className = "w-20 h-20 mx-auto mb-3 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center text-red-400 text-4xl shadow-lg shadow-red-500/30";
+                icon.className = "fa-solid fa-circle-xmark";
+                exp.innerText = `Jawaban belum tepat. Pahami kembali: ${q.explanation}`;
+            }
+
+            modal.classList.remove('hidden');
+            modal.classList.remove('scale-90');
+            modal.classList.add('scale-100');
+        }
+
+        function closeFeedbackModal() {
+            const modal = document.getElementById('feedbackModal');
+            modal.classList.add('hidden');
+
+            if (state.lives <= 0) {
+                // Game Over Screen
+                document.getElementById('gameplayHud').classList.add('hidden');
+                document.getElementById('gameOverScreen').classList.remove('hidden');
+                return;
+            }
+
+            // Check if mission complete or next question
+            const mission = GAME_MISSIONS[state.currentMissionIdx];
+            if (state.currentQuestionIdx + 1 < mission.questions.length) {
+                state.currentQuestionIdx++;
+                state.isPlaying = true;
+                loadCurrentQuestion();
+            } else {
+                // Unlock next mission if available
+                if (state.currentMissionIdx + 1 < GAME_MISSIONS.length) {
+                    GAME_MISSIONS[state.currentMissionIdx + 1].unlocked = true;
+                    showMissionSelect();
+                } else {
+                    // All 5 missions completed - Show Victory Screen!
+                    triggerVictory();
+                }
+            }
+        }
+
+        function retryCurrentMission() {
+            startMission(state.currentMissionIdx);
+        }
+
+        function triggerVictory() {
+            audioFX.playVictory();
+            document.getElementById('navbar').classList.add('hidden');
+            document.getElementById('gameplayHud').classList.add('hidden');
+
+            document.getElementById('victoryPilotName').innerText = state.pilotName;
+            document.getElementById('victoryTotalScore').innerText = `${state.score} / ${GAME_MISSIONS.length * 3 * 100}`;
+            document.getElementById('victoryApreciationText').innerText = 
+                `"Luar biasa, Astronot ${state.pilotName}! Kamu telah berhasil menyelesaikan seluruh 5 Misi Siklus Air IPAS Kelas 5 dengan sangat gemilang!"`;
+
+            document.getElementById('victoryScreen').classList.remove('hidden');
+        }
+
+        function restartFullGame() {
+            state.score = 0;
+            GAME_MISSIONS.forEach((m, idx) => m.unlocked = (idx === 0));
+            showMissionSelect();
+        }
+
+        // Window Load Initialization
+        window.onload = function() {
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
